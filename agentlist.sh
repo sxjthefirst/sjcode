@@ -5,7 +5,7 @@ __LOGLEVEL=6
 #Logging stuff
 declare -A LOG_LEVELS
 # https://en.wikipedia.org/wiki/Syslog#Severity_level
-LOG_LEVELS=([0]="emerg" [1]="alert" [2]="critical" [3]="error" [4]="warning" [5]="notice" [6]="info" [7]="debug")
+LOG_LEVELS=([0]="Emerg" [1]="Alert" [2]="Critical" [3]="Error" [4]="Warning" [5]="Notice" [6]="Info" [7]="Debug")
 function loglevel () {
   local LEVEL=${1}
   shift
@@ -15,14 +15,39 @@ function loglevel () {
 }
 
 #Get user creds
-user=`test -z $USER && echo jagannsr || echo $USER`
+#user=`test -z $USER && echo jagannsr || echo $USER`
+#echo "LAN password for $user"
+#read -s password
+#url="http://apm.prd.emaas.cba:8090/controller/rest" #production controller
 outfile="agentdata.csv"
 sumfile="agentdatasummary.csv"
-echo "LAN password for $user"
-read -s password
+#user=appd_api
+#password="Appd123$"
+#Read config file
+cnf_file=.agentlist.cnf
+if [ ! -r $cnf_file ]; then
+	loglevel 2 "Can't find  $cnf_file"
+	exit 1
+fi
+while read -r line; do 
+	declare  $line
+done <$cnf_file
+
+if [ -z $user ]; then
+	loglevel 2 "Unable to determine username check $cnf_file"
+	exit 1
+fi
+if [ -z $password ]; then
+	loglevel 2 "Unable to determine password check $cnf_file"
+	exit 1
+fi
+if [ -z $url ]; then
+	loglevel 2 "Unable to determine Controller URL check $cnf_file"
+	exit 1
+fi
+
 
 #Download list of applications first
-url="http://apm.prd.emaas.cba/controller/rest" #production controller
 echo "INFO: Getting list of applications from $url ..."
 apps=`curl --user ${user}@customer1:${password} ${url}/applications/ 2>/dev/null | grep "<name>"`
 if [ -z "${apps}" ]; then
@@ -78,8 +103,8 @@ do
 	loglevel 7 "$app_name,$node_name,$agent_status,$start_time,$machine_version,$appagent_version,$metric_url"
 	echo $app_name,$node_name,${STATUS[$agent_status]},$machine_version,$appagent_version >>  $outfile
  done
- #Count the unique node per app
- app_count=`grep "$app_name\," $outfile | sort -u | wc -l`
+ #Count the unique active agents per app
+ app_count=`grep "$app_name\," $outfile | grep -v Inactive | sort -u | wc -l`
  echo $app_name,$app_count >> $sumfile 
 done
 
